@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Constancias Médicas - IPN</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librerías de exportación -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Fuentes Premium y Clínicas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --ipn-blue: #005dab;
+            --ipn-red: #db2828;
+            --ipn-green: #009639;
+            --ipn-yellow: #ffc600;
+            --clinical-gray: #f9fafb;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            background-color: #cbd5e1;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Área de vista previa - DIMENSIONES ESTRICTAS A4 (96dpi) */
+        .a4-container {
+            width: 794px !important;
+            height: 1123px !important;
+            min-width: 794px !important;
+            min-height: 1123px !important;
+            max-width: 794px !important;
+            max-height: 1123px !important;
+            box-sizing: border-box;
+            padding: 60px 70px; /* Ajuste de márgenes internos en px */
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            position: relative;
+            flex-shrink: 0; /* IMPRESCINDIBLE: Evita que se vuelva una tira fina */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Clase temporal al exportar para evitar recortes de sombra */
+        .exporting-mode {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            transform: none !important;
+        }
+
+        @media (max-width: 1024px) {
+            .a4-wrapper {
+                overflow-x: auto;
+                padding-bottom: 2rem;
+            }
+        }
+
+        /* --- MARCA DE AGUA --- */
+        .watermark {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 65%;
+            opacity: 0.03; 
+            pointer-events: none;
+            z-index: 0;
+            display: flex;
+            justify-content: center;
+        }
+        .watermark img {
+            width: 100%;
+            height: auto;
+            filter: grayscale(100%);
+        }
+
+        .doc-content-wrapper {
+            position: relative;
+            z-index: 1;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            padding: 50px;
+            background: #ffffff;
+            height: 100%;
+        }
+
+        /* --- ENCABEZADO MÉDICO --- */
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--ipn-blue);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .doc-logo {
+            max-width: 150px;
+            max-height: 75px;
+            object-fit: contain;
+        }
+
+        .doc-header-text {
+            text-align: right;
+        }
+
+        .doc-inst-name {
+            font-family: 'Montserrat', sans-serif;
+            color: var(--ipn-blue);
+            font-weight: 800;
+            font-size: 13pt;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .doc-depto {
+            font-weight: 600;
+            font-size: 9pt;
+            color: #374151;
+            margin: 4px 0;
+            letter-spacing: 1px;
+        }
+
+        .doc-meta {
+            font-size: 8pt;
+            color: #6b7280;
+            margin: 0;
+            font-family: monospace;
+        }
+
+        /* Barra de colores institucional superior */
+        .top-color-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(to right, var(--ipn-red) 25%, var(--ipn-green) 25%, var(--ipn-green) 50%, var(--ipn-yellow) 50%, var(--ipn-yellow) 75%, var(--ipn-blue) 75%);
+        }
+
+        /* --- TÍTULO --- */
+        .doc-title {
+            text-align: center;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14pt;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin: 10px 0 25px 0;
+            color: #111827;
+            text-transform: uppercase;
+            background-color: var(--clinical-gray);
+            padding: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- CUADRO DE FILIACIÓN --- */
+        .patient-data-box {
+            border: 1px solid var(--ipn-blue);
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 25px;
+            background-color: #fcfcfc;
+        }
+
+        .data-row {
+            display: flex;
+            margin-bottom: 8px;
+            font-size: 10.5pt;
+        }
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .data-label {
+            font-weight: 700;
+            color: var(--ipn-blue);
+            width: 160px;
+            flex-shrink: 0;
+        }
+
+        .data-value {
+            font-weight: 600;
+            color: #111827;
+            border-bottom: 1px solid #d1d5db;
+            flex-grow: 1;
+            padding-left: 5px;
+            text-transform: uppercase;
+        }
+
+        /* --- CUERPO DEL DOCUMENTO --- */
+        .doc-body {
+            font-family: 'Libre Baskerville', serif;
+            color: #1f2937;
+            line-height: 1.8;
+            font-size: 11pt;
+            text-align: justify;
+            margin-bottom: auto; /* Empuja el footer hacia abajo */
+        }
+
+        .doc-body p {
+            margin-bottom: 15px;
+        }
+
+        /* --- FIRMA --- */
+        .doc-signature-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .signature-image {
+            max-width: 250px;
+            height: 100px;
+            object-fit: contain;
+            margin-bottom: -25px;
+            filter: grayscale(100%) brightness(150%) contrast(400%);
+            mix-blend-mode: multiply;
+            z-index: 10;
+            position: relative;
+        }
+
+        .signature-line {
+            width: 280px;
+            border-top: 1px solid #111827;
+            margin-top: 5px;
+        }
+
+        .signature-text {
+            margin-top: 8px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 10pt;
+            text-transform: uppercase;
+            color: #111827;
+        }
+        
+        .signature-subtext {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 8pt;
+            color: #6b7280;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Barra Superior -->
+    <header class="bg-white border-b shadow-sm py-3 px-6 flex justify-between items-center shrink-0 z-20 relative">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-700 p-2 rounded-lg">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-gray-800 leading-tight">Módulo de Documentación Clínica</h1>
+                <p class="text-xs text-gray-500 font-medium">Instituto Privado del Niño - Generador Oficial</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="descargarPDF()" class="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md font-semibold transition-all shadow-sm text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                PDF (Expediente)
+            </button>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Panel Izquierdo: Formulario -->
+        <div class="w-full lg:w-1/3 bg-white p-6 overflow-y-auto border-r border-gray-200 shrink-0 shadow-inner z-10">
+            
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    Datos de Internación
+                </h2>
+                <p class="text-xs text-gray-500 mt-2">Ingrese la información. La fecha de emisión y el folio se generan automáticamente.</p>
+            </div>
+            
+            <form id="datos-form" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Nombre del Paciente</label>
+                    <input type="text" id="in-paciente" placeholder="Apellidos y Nombres" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm text-sm font-medium" oninput="actualizarDocumento()">
+                </div>
+                <div class="pt-3 border-t border-gray-100">
+                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Acompañante / Responsable</label>
+                    <input type="text" id="in-tutor" placeholder="Nombre completo" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm text-sm font-medium" oninput="actualizarDocumento()">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Documento de Identidad (C.I.)</label>
+                    <input type="text" id="in-ci" placeholder="Ej. 1.234.567" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm text-sm font-medium" oninput="actualizarDocumento()">
+                </div>
+                <div class="pt-3 border-t border-gray-100">
+                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide text-blue-700">Fecha y Hora de Admisión</label>
+                    <input type="datetime-local" id="in-fecha-ingreso" class="w-full px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors cursor-pointer text-sm font-bold text-blue-900" onchange="actualizarDocumento()">
+                </div>
+            </form>
+        </div>
+
+        <!-- Panel Derecho: Vista Previa del Documento -->
+        <!-- overflow-x-auto permite hacer scroll si la pantalla es chica, manteniendo el documento intacto -->
+        <div class="w-full lg:w-2/3 bg-[#e2e8f0] overflow-auto p-4 lg:p-8 flex justify-center items-start a4-wrapper">
+            
+            <!-- EL DOCUMENTO (FIJO EN A4: 794x1123px) -->
+            <div id="documento-imprimible" class="a4-container">
+                
+                <div class="top-color-bar"></div>
+
+                <!-- Marca de Agua -->
+                <div class="watermark">
+                    <img src="logo ipn (12).png" alt="" onerror="this.style.display='none';">
+                </div>
+
+                <div class="doc-content-wrapper">
+                    
+                    <!-- Encabezado Clínico -->
+                    <div class="doc-header">
+                        <img src="logo ipn (12).png" alt="Logo IPN" class="doc-logo" 
+                             onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';">
+                        <div id="logo-fallback" style="display: none; font-size: 28pt; font-weight: 800; color: var(--ipn-blue);">IPN</div>
+                        
+                        <div class="doc-header-text">
+                            <h2 class="doc-inst-name">Instituto Privado del Niño</h2>
+                            <p class="doc-depto">DEPARTAMENTO DE ADMISIÓN Y ARCHIVO</p>
+                            <p class="doc-meta">Asunción - Paraguay | Tel: 021 211 203</p>
+                        </div>
+                    </div>
+
+                    <div class="doc-title">Constancia Médica de Internación</div>
+
+                    <!-- Cuadro de Filiación -->
+                    <div class="patient-data-box">
+                        <div class="data-row">
+                            <div class="data-label">PACIENTE:</div>
+                            <div class="data-value" id="out-paciente"></div>
+                        </div>
+                        <div class="data-row">
+                            <div class="data-label">ACOMPAÑANTE / TUTOR:</div>
+                            <div class="data-value" id="out-tutor"></div>
+                        </div>
+                        <div class="data-row">
+                            <div class="data-label">DOCUMENTO (C.I.):</div>
+                            <div class="data-value" id="out-ci"></div>
+                        </div>
+                        <div class="data-row">
+                            <div class="data-label">FECHA DE INGRESO:</div>
+                            <div class="data-value" id="out-fecha-ingreso"></div>
+                        </div>
+                    </div>
+
+                    <!-- Cuerpo Médico Legal -->
+                    <div class="doc-body">
+                        <p><strong>A quien corresponda:</strong></p>
+                        <p>
+                            Por medio de la presente, la Dirección Médica y el Departamento de Admisión del <strong>Instituto Privado del Niño y Adolescente</strong> hacen constar que el/la paciente cuyos datos de filiación se detallan en el recuadro superior, se encuentra actualmente ingresado/a en nuestra institución recibiendo la atención médica correspondiente a su cuadro clínico.
+                        </p>
+                        <p>
+                            El ingreso se ha efectuado en la fecha y hora señaladas en el registro de admisión de nuestro sistema hospitalario, permaneciendo bajo el cuidado y acompañamiento de su responsable legal debidamente identificado.
+                        </p>
+                        <p>
+                            Se expide el presente documento a petición de la parte interesada, para los fines legales, administrativos o justificaciones laborales que estime convenientes, en la ciudad de Asunción, a los <span id="out-fecha-expedicion" style="font-weight: bold;"></span>.
+                        </p>
+                    </div>
+
+                    <!-- Firma Nueva -->
+                    <div class="doc-signature-section">
+                        <img src="Gemini_Generated_Image_i22zyyi22zyyi22z.jpg" alt="Firma Autorizada" class="signature-image"
+                             onerror="this.onerror=null; this.style.display='none';">
+                        
+                        <div class="signature-line"></div>
+                        <p class="signature-text">Dpto. de Admisión - IPN</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Script de Lógica -->
+    <script>
+        let folioActual = '';
+        let fechaActualTexto = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            generarFolio();
+            establecerFechaExpedicion();
+            actualizarDocumento();
+        });
+
+        function generarFolio() {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const randomId = Math.floor(1000 + Math.random() * 9000); 
+            folioActual = `IPN-${year}${month}-${randomId}`;
+        }
+
+        function establecerFechaExpedicion() {
+            const hoy = new Date();
+            const dia = hoy.getDate();
+            const mes = hoy.toLocaleDateString('es-PY', { month: 'long' });
+            const anio = hoy.getFullYear();
+            
+            fechaActualTexto = `${dia} días del mes de ${mes} del ${anio}`;
+            document.getElementById('out-fecha-expedicion').textContent = fechaActualTexto;
+        }
+
+        function formatearFechaIngreso(fechaStr) {
+            if (!fechaStr) return null;
+            const fecha = new Date(fechaStr);
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            let textoFormat = fecha.toLocaleDateString('es-PY', opciones);
+            const hora = fecha.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' });
+            
+            return `${textoFormat} - ${hora} hs.`;
+        }
+
+        function actualizarDocumento() {
+            const paciente = document.getElementById('in-paciente').value.trim();
+            const tutor = document.getElementById('in-tutor').value.trim();
+            const ci = document.getElementById('in-ci').value.trim();
+            const fechaIngreso = document.getElementById('in-fecha-ingreso').value;
+
+            document.getElementById('out-paciente').innerHTML = paciente || '<span style="color: #9ca3af; font-weight: 400;">[NO ESPECIFICADO]</span>';
+            document.getElementById('out-tutor').innerHTML = tutor || '<span style="color: #9ca3af; font-weight: 400;">[NO ESPECIFICADO]</span>';
+            document.getElementById('out-ci').innerHTML = ci || '<span style="color: #9ca3af; font-weight: 400;">[NO ESPECIFICADO]</span>';
+            
+            const fechaFmt = formatearFechaIngreso(fechaIngreso);
+            document.getElementById('out-fecha-ingreso').innerHTML = fechaFmt || '<span style="color: #9ca3af; font-weight: 400;">[SELECCIONE FECHA Y HORA DE INGRESO]</span>';
+        }
+
+        function getFileName(ext) {
+            const nombre = document.getElementById('in-paciente').value.trim() || 'Paciente';
+            return `Certificado_${folioActual}_${nombre.replace(/\s+/g, '_')}.${ext}`;
+        }
+
+        function prepararParaExportar(elemento) {
+            elemento.classList.add('exporting-mode');
+        }
+
+        function restaurarDespuesDeExportar(elemento) {
+            elemento.classList.remove('exporting-mode');
+        }
+
+        // Exportación a PDF FORZADA a tamaño A4 (794x1123)
+        function descargarPDF() {
+            const elemento = document.getElementById('documento-imprimible');
+            prepararParaExportar(elemento);
+            
+            const opciones = {
+                margin:       0,
+                filename:     getFileName('pdf'),
+                image:        { type: 'jpeg', quality: 1.0 },
+                // html2canvas lee el tamaño fijo del div (794x1123)
+                html2canvas:  { scale: 2, useCORS: true, letterRendering: true, width: 794, height: 1123 },
+                // Forzamos al creador de PDF a usar EXACTAMENTE esas medidas para crear 1 sola página
+                jsPDF:        { unit: 'px', format: [794, 1123], orientation: 'portrait' }
+            };
+
+            const btn = document.querySelector('button[onclick="descargarPDF()"]');
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = 'Procesando...';
+            btn.disabled = true;
+
+            html2pdf().set(opciones).from(elemento).save().then(() => {
+                restaurarDespuesDeExportar(elemento);
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }).catch(() => {
+                restaurarDespuesDeExportar(elemento);
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
